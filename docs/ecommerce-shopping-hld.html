@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-commerce shopping – high-level design (AWS and Azure)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f6f7f9;color:#1d1d1f}
+  main{max-width:1320px;margin:32px auto;padding:0 20px 40px}
+  h1{font-size:22px;margin:0 0 6px} .sub{margin:0 0 24px;color:#555;font-size:14px}
+  .flow{display:flex;flex-direction:column;align-items:center}
+  .row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+  .box{background:#fff;border:2px solid #9aa4b2;border-radius:10px;padding:10px 14px;text-align:center;font-size:14px;min-width:170px;max-width:260px}
+  .box b{display:block;margin-bottom:2px}
+  .box small{color:#555}
+  .input{border-color:#607d8b}
+  .agent{border-color:#3367d6;background:#e8f0fe;max-width:420px}
+  .tool{border-color:#3367d6;background:#f3f7ff}
+  .check{border-color:#f9a825;background:#fff8e1}
+  .decision{border-color:#f9a825;background:#fff3c4;transform:none;border-radius:40px;padding:12px 26px;font-weight:600}
+  .fail{border-color:#c62828;background:#fdecea}
+  .pass{border-color:#2e7d32;background:#e8f5e9}
+  .group{border:1px dashed #b0b8c4;border-radius:12px;padding:12px;position:relative;width:100%;margin:6px 0}
+  .group > .tag{position:absolute;top:-10px;left:14px;background:#f6f7f9;padding:0 6px;font-size:12px;color:#555;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+  .side-col .group > .tag{background:#fff}
+  .arrow{display:flex;flex-direction:column;align-items:center;margin:4px 0;color:#5f6b7a;font-size:12px}
+  .arrow .line{width:2px;height:22px;background:#5f6b7a}
+  .arrow .head{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #5f6b7a}
+  .branches{display:flex;gap:28px;width:100%;justify-content:center;flex-wrap:wrap}
+  .branch{flex:1;min-width:220px;max-width:420px;display:flex;flex-direction:column;align-items:center}
+  .label{font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;margin-bottom:2px}
+  .label.no{background:#fdecea;color:#c62828} .label.yes{background:#e8f5e9;color:#2e7d32}
+  .or{font-size:12px;color:#777;margin:4px 0}
+  .loop{border-color:#3367d6;background:#f3f7ff}
+  ol{font-size:13px;text-align:left;margin:6px 0 0;padding-left:18px;color:#333}
+  ul{font-size:14px;line-height:1.6;color:#333;margin-top:28px}
+  .cols{display:flex;gap:14px;width:100%;flex-wrap:wrap;justify-content:center}
+  .col{flex:1;min-width:230px;display:flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #d6dbe2;border-radius:10px;padding:10px}
+  .col h3{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.03em;color:#455a64}
+  .col .box{width:100%;max-width:none;min-width:0}
+  .svc{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#232f3e;border-radius:4px;padding:1px 6px;margin:0 2px 4px}
+  .svc.az{background:#0b3a66}
+  .svc.both{background:#455a64}
+  .cache{border-color:#6a1b9a;background:#f3e5f5}
+  .state{border-color:#00838f;background:#e0f7fa}
+  .ml-box{border-color:#ef6c00;background:#fff3e0}
+  .side{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+  h2{font-size:19px;margin:44px 0 6px;border-top:1px solid #d6dbe2;padding-top:24px}
+  .compare{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+  .compare > .side-col{flex:1;min-width:440px;background:#fff;border:1px solid #d6dbe2;border-radius:14px;padding:16px 14px 20px}
+  .compare .box{max-width:340px}
+  .vtag{font-size:17px;margin:0 0 16px;border:0;padding:0;text-align:center}
+  .vtag span{display:inline-block;font-size:11px;font-weight:700;color:#fff;border-radius:999px;padding:3px 9px;margin-right:8px;vertical-align:middle;letter-spacing:.04em}
+  .vtag .llm{background:#3367d6} .vtag .ml{background:#ef6c00}
+  .key{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#555;margin:0 0 18px}
+  .ringwrap{display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap;width:100%}
+  .ring{position:relative;width:300px;height:300px;border:4px solid #3367d6;border-radius:50%;margin:30px}
+  .ring .center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-size:12px;color:#455a64;width:150px}
+  .vn{position:absolute;top:50%;left:50%;width:0;height:0}
+  .vn span{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:#fff;border-radius:999px;padding:3px 7px;white-space:nowrap}
+  .r1{background:#1565c0}.r2{background:#2e7d32}.r3{background:#ef6c00}.r4{background:#6a1b9a}
+  .dead{background:#9e9e9e!important;text-decoration:line-through}
+  .legend{font-size:13px;line-height:1.8;max-width:420px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;margin:10px 0}
+  th,td{border:1px solid #d6dbe2;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#eef1f5}
+  td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .note{font-size:12px;color:#555;margin:6px 0 0}
+  .tests{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:10px}
+  .tcard{background:#fff;border:1px solid #d6dbe2;border-left:4px solid #3367d6;border-radius:8px;padding:10px 14px;font-size:13px}
+  .tcard h3{font-size:14px;margin:0 0 6px}
+  .tcard ul{margin:0;padding-left:18px;font-size:13px;line-height:1.55}
+  .flow > .box{max-width:420px}
+  .opt{border-style:dashed}
+  code{font-size:12px;background:#eef1f5;border-radius:3px;padding:0 4px}
+</style>
+</head>
+<body>
+<main>
+  <h1>E-commerce shopping: high-level design, AWS with Azure equivalents</h1>
+  <p class="sub">A typical online store: product catalog, search, cart, checkout, payment, inventory, orders, recommendations and notifications. Every component shows the AWS service and its Azure equivalent. An optional shopping concierge agent sits beside the core store.</p>
+  <div class="key"><span><span class="svc">AWS</span> dark badge = AWS service</span><span><span class="svc az">Azure</span> blue badge = Azure equivalent</span><span><span class="svc both">Both</span> grey badge = external or cloud-neutral</span></div>
+  <div class="flow">
+    <div class="box input"><b>Shopper</b><small>web or mobile app: browse, search, add to cart, check out</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Edge and identity</span><div class="row">
+      <div class="box cache"><span class="svc">Amazon CloudFront</span><span class="svc">Amazon S3</span><br><span class="svc az">Azure Front Door / Azure CDN</span><span class="svc az">Blob Storage</span><b>Front end and images</b><small>static web app, product images, cached catalog pages at the edge</small></div>
+      <div class="box input"><span class="svc">Amazon Cognito</span><span class="svc az">Entra ID B2C</span><b>Sign-in and tokens</b><small>shopper accounts, guest sessions, JWTs on every API call</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box tool"><span class="svc">Amazon API Gateway</span><span class="svc az">API Management</span><b>Public API</b><small>auth check, throttling, request validation, routes to domain services</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Domain services (AWS Lambda / Azure Functions)</span><div class="row">
+      <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Azure Functions</span><b>Catalog</b><small>products, prices, variants</small></div>
+      <div class="box tool"><span class="svc">Amazon OpenSearch</span><span class="svc az">Azure AI Search</span><b>Search</b><small>full text, facets, typo tolerance</small></div>
+      <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Azure Functions</span><b>Cart</b><small>add, update, remove, price the cart</small></div>
+      <div class="box tool"><span class="svc">AWS Step Functions</span><span class="svc az">Durable Functions / Logic Apps</span><b>Checkout saga</b><small>reserve inventory, charge payment, confirm order, compensate on failure</small></div>
+      <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Azure Functions</span><b>Inventory</b><small>stock levels and reservations with expiry</small></div>
+      <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Azure Functions</span><b>Orders</b><small>order record, status, history</small></div>
+    </div></div>
+    <div class="arrow"><span>checkout charges the card through</span><div class="line"></div><div class="head"></div></div>
+    <div class="box check"><span class="svc both">External</span><b>Payment provider (Stripe / Razorpay / Adyen)</b><small>authorise and capture with an idempotency key per order; webhook confirms the result</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Data stores</span><div class="row">
+      <div class="box state"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Catalog, cart, orders, inventory</b><small>single-digit-ms key lookups; streams feed search and events</small></div>
+      <div class="box cache"><span class="svc">Amazon ElastiCache (Redis)</span><span class="svc az">Azure Cache for Redis</span><b>Hot cache</b><small>sessions, hot catalog items, cart cache</small></div>
+      <div class="box state"><span class="svc">Amazon S3</span><span class="svc az">Blob Storage / ADLS Gen2</span><b>Images and analytics lake</b><small>media, order and clickstream exports</small></div>
+    </div></div>
+    <div class="arrow"><span>order placed</span><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Async events</span><div class="row">
+      <div class="box input"><span class="svc">Amazon SQS</span><span class="svc az">Service Bus queues</span><b>Order queue</b><small>buffers order processing; dead-letter queue for failures</small></div>
+      <div class="box input"><span class="svc">Amazon EventBridge</span><span class="svc az">Event Grid</span><b>Order events bus</b><small>OrderPlaced, PaymentCaptured, OrderShipped to inventory, analytics, email</small></div>
+      <div class="box input"><span class="svc">Amazon SNS</span><span class="svc az">Event Grid / Notification Hubs</span><b>Notifications</b><small>email, SMS and push to the shopper</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">ML and agent</span><div class="row">
+      <div class="box ml-box"><span class="svc">Amazon SageMaker endpoint</span><span class="svc az">Azure ML endpoint</span><b>Recommendations</b><small>similar items and frequently bought together, trained on orders and clickstream</small></div>
+      <div class="box agent opt"><span class="svc">Bedrock (Claude)</span><span class="svc">Strands Agents</span><span class="svc">AgentCore Runtime</span><br><span class="svc az">Azure OpenAI</span><span class="svc az">Semantic Kernel</span><b>Shopping concierge agent (optional)</b><small>builds bundles; tools for catalog search, compatibility, warranty and financing; a validation guardrail checks the bundle before it is shown</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box pass"><span class="svc">Amazon CloudWatch</span><span class="svc">AWS X-Ray</span><span class="svc az">Azure Monitor</span><span class="svc az">Application Insights</span><b>Monitoring and tracing</b><small>latency per API, checkout success rate, payment failures, queue depth, agent tool errors</small></div>
+  </div>
+
+  <h2>AWS to Azure mapping</h2>
+  <table>
+    <tr><th>Component</th><th>AWS</th><th>Azure equivalent</th></tr>
+    <tr><td>Front end, images, edge cache</td><td>CloudFront + S3</td><td>Front Door / Azure CDN + Blob Storage</td></tr>
+    <tr><td>Shopper identity</td><td>Cognito</td><td>Entra ID B2C</td></tr>
+    <tr><td>Public API</td><td>API Gateway</td><td>API Management</td></tr>
+    <tr><td>Domain services</td><td>Lambda</td><td>Azure Functions</td></tr>
+    <tr><td>Catalog, cart, orders, inventory data</td><td>DynamoDB</td><td>Cosmos DB</td></tr>
+    <tr><td>Sessions, hot catalog, cart cache</td><td>ElastiCache (Redis)</td><td>Azure Cache for Redis</td></tr>
+    <tr><td>Product search</td><td>OpenSearch Service</td><td>Azure AI Search</td></tr>
+    <tr><td>Checkout and order saga</td><td>Step Functions</td><td>Durable Functions or Logic Apps</td></tr>
+    <tr><td>Order queue</td><td>SQS (with DLQ)</td><td>Service Bus queues (with dead-letter)</td></tr>
+    <tr><td>Order events</td><td>EventBridge</td><td>Event Grid</td></tr>
+    <tr><td>Shopper notifications</td><td>SNS</td><td>Event Grid / Notification Hubs</td></tr>
+    <tr><td>Recommendations</td><td>SageMaker endpoint</td><td>Azure ML endpoint</td></tr>
+    <tr><td>Shopping concierge agent (optional)</td><td>Strands Agents on Bedrock (Claude), AgentCore Runtime</td><td>Azure OpenAI + Semantic Kernel agents</td></tr>
+    <tr><td>Payment</td><td colspan="2">External payment provider (Stripe / Razorpay / Adyen) with idempotency keys, same on both clouds</td></tr>
+    <tr><td>Monitoring and tracing</td><td>CloudWatch + X-Ray</td><td>Azure Monitor + Application Insights</td></tr>
+  </table>
+  <ul>
+    <li><b>Reads are cheap:</b> catalog and search pages are served from the edge and Redis; only cart and checkout calls hit the database every time.</li>
+    <li><b>Checkout is a saga:</b> each step (reserve, charge, confirm) has a compensating step (release, refund, cancel), so a failure never leaves stock held or a card charged without an order.</li>
+    <li><b>Agent is optional and fenced:</b> the concierge only proposes bundles; prices, stock and compatibility are re-checked in code before the shopper sees the package.</li>
+  </ul>
+</main>
+</body>
+</html>

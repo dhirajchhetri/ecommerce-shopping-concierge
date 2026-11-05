@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-commerce shopping – low-level design (AWS and Azure)</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:#f6f7f9;color:#1d1d1f}
+  main{max-width:1320px;margin:32px auto;padding:0 20px 40px}
+  h1{font-size:22px;margin:0 0 6px} .sub{margin:0 0 24px;color:#555;font-size:14px}
+  .flow{display:flex;flex-direction:column;align-items:center}
+  .row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+  .box{background:#fff;border:2px solid #9aa4b2;border-radius:10px;padding:10px 14px;text-align:center;font-size:14px;min-width:170px;max-width:260px}
+  .box b{display:block;margin-bottom:2px}
+  .box small{color:#555}
+  .input{border-color:#607d8b}
+  .agent{border-color:#3367d6;background:#e8f0fe;max-width:420px}
+  .tool{border-color:#3367d6;background:#f3f7ff}
+  .check{border-color:#f9a825;background:#fff8e1}
+  .decision{border-color:#f9a825;background:#fff3c4;transform:none;border-radius:40px;padding:12px 26px;font-weight:600}
+  .fail{border-color:#c62828;background:#fdecea}
+  .pass{border-color:#2e7d32;background:#e8f5e9}
+  .group{border:1px dashed #b0b8c4;border-radius:12px;padding:12px;position:relative;width:100%;margin:6px 0}
+  .group > .tag{position:absolute;top:-10px;left:14px;background:#f6f7f9;padding:0 6px;font-size:12px;color:#555;font-weight:600;letter-spacing:.03em;text-transform:uppercase}
+  .side-col .group > .tag{background:#fff}
+  .arrow{display:flex;flex-direction:column;align-items:center;margin:4px 0;color:#5f6b7a;font-size:12px}
+  .arrow .line{width:2px;height:22px;background:#5f6b7a}
+  .arrow .head{width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid #5f6b7a}
+  .branches{display:flex;gap:28px;width:100%;justify-content:center;flex-wrap:wrap}
+  .branch{flex:1;min-width:220px;max-width:420px;display:flex;flex-direction:column;align-items:center}
+  .label{font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;margin-bottom:2px}
+  .label.no{background:#fdecea;color:#c62828} .label.yes{background:#e8f5e9;color:#2e7d32}
+  .or{font-size:12px;color:#777;margin:4px 0}
+  .loop{border-color:#3367d6;background:#f3f7ff}
+  ol{font-size:13px;text-align:left;margin:6px 0 0;padding-left:18px;color:#333}
+  ul{font-size:14px;line-height:1.6;color:#333;margin-top:28px}
+  .cols{display:flex;gap:14px;width:100%;flex-wrap:wrap;justify-content:center}
+  .col{flex:1;min-width:230px;display:flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #d6dbe2;border-radius:10px;padding:10px}
+  .col h3{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:.03em;color:#455a64}
+  .col .box{width:100%;max-width:none;min-width:0}
+  .svc{display:inline-block;font-size:11px;font-weight:700;color:#fff;background:#232f3e;border-radius:4px;padding:1px 6px;margin:0 2px 4px}
+  .svc.az{background:#0b3a66}
+  .svc.both{background:#455a64}
+  .cache{border-color:#6a1b9a;background:#f3e5f5}
+  .state{border-color:#00838f;background:#e0f7fa}
+  .ml-box{border-color:#ef6c00;background:#fff3e0}
+  .side{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+  h2{font-size:19px;margin:44px 0 6px;border-top:1px solid #d6dbe2;padding-top:24px}
+  .compare{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+  .compare > .side-col{flex:1;min-width:440px;background:#fff;border:1px solid #d6dbe2;border-radius:14px;padding:16px 14px 20px}
+  .compare .box{max-width:340px}
+  .vtag{font-size:17px;margin:0 0 16px;border:0;padding:0;text-align:center}
+  .vtag span{display:inline-block;font-size:11px;font-weight:700;color:#fff;border-radius:999px;padding:3px 9px;margin-right:8px;vertical-align:middle;letter-spacing:.04em}
+  .vtag .llm{background:#3367d6} .vtag .ml{background:#ef6c00}
+  .key{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#555;margin:0 0 18px}
+  .ringwrap{display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap;width:100%}
+  .ring{position:relative;width:300px;height:300px;border:4px solid #3367d6;border-radius:50%;margin:30px}
+  .ring .center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-size:12px;color:#455a64;width:150px}
+  .vn{position:absolute;top:50%;left:50%;width:0;height:0}
+  .vn span{position:absolute;transform:translate(-50%,-50%);font-size:11px;font-weight:700;color:#fff;border-radius:999px;padding:3px 7px;white-space:nowrap}
+  .r1{background:#1565c0}.r2{background:#2e7d32}.r3{background:#ef6c00}.r4{background:#6a1b9a}
+  .dead{background:#9e9e9e!important;text-decoration:line-through}
+  .legend{font-size:13px;line-height:1.8;max-width:420px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  table{border-collapse:collapse;width:100%;font-size:13px;background:#fff;margin:10px 0}
+  th,td{border:1px solid #d6dbe2;padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:#eef1f5}
+  td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .note{font-size:12px;color:#555;margin:6px 0 0}
+  .tests{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:10px}
+  .tcard{background:#fff;border:1px solid #d6dbe2;border-left:4px solid #3367d6;border-radius:8px;padding:10px 14px;font-size:13px}
+  .tcard h3{font-size:14px;margin:0 0 6px}
+  .tcard ul{margin:0;padding-left:18px;font-size:13px;line-height:1.55}
+  .flow > .box{max-width:420px}
+  .opt{border-style:dashed}
+  code{font-size:12px;background:#eef1f5;border-radius:3px;padding:0 4px}
+</style>
+</head>
+<body>
+<main>
+  <h1>E-commerce shopping: low-level design, AWS with Azure equivalents</h1>
+  <p class="sub">Request paths for each shopper flow, the checkout saga with its compensation branches, caching, data model, resilience, latency targets and testing. AWS services are shown with their Azure equivalents.</p>
+  <div class="key"><span><span class="svc">AWS</span> dark badge = AWS service</span><span><span class="svc az">Azure</span> blue badge = Azure equivalent</span><span><span class="svc both">Both</span> grey badge = external or cloud-neutral</span></div>
+
+  <h2>1. Request paths: browse, search and cart</h2>
+  <div class="flow">
+    <div class="group"><span class="tag">Edge (every request)</span><div class="row">
+      <div class="box cache"><span class="svc">Amazon CloudFront</span><span class="svc">Amazon S3</span><br><span class="svc az">Front Door / Azure CDN</span><span class="svc az">Blob Storage</span><b>Static app, images, cached pages</b><small>category and product pages cached 60 s; images cached for days</small></div>
+      <div class="box input"><span class="svc">Amazon Cognito</span><span class="svc az">Entra ID B2C</span><b>JWT for the shopper</b><small>guests get an anonymous session ID</small></div>
+      <div class="box tool"><span class="svc">Amazon API Gateway</span><span class="svc az">API Management</span><b>Validate and throttle</b><small>JWT authoriser, per-client rate limits, schema checks</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="cols">
+      <div class="col"><h3>Browse product</h3>
+        <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Functions</span><b>GET /products/{id}</b><small>catalog service</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box cache"><span class="svc">ElastiCache (Redis)</span><span class="svc az">Azure Cache for Redis</span><b>Hot catalog lookup</b><small>hit: return; miss: read through</small></div><div class="arrow"><span>on miss</span><div class="line"></div><div class="head"></div></div>
+        <div class="box state"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Catalog table</b><small>then write back to Redis with TTL</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box ml-box"><span class="svc">SageMaker endpoint</span><span class="svc az">Azure ML endpoint</span><b>Recommendations widget</b><small>loaded async; falls back to best sellers on timeout</small></div>
+      </div>
+      <div class="col"><h3>Search</h3>
+        <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Functions</span><b>GET /search?q=</b><small>query builder: text, facets, filters</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box tool"><span class="svc">Amazon OpenSearch</span><span class="svc az">Azure AI Search</span><b>Search index</b><small>ranked hits with facet counts</small></div><div class="arrow"><span>index kept fresh by</span><div class="line"></div><div class="head"></div></div>
+        <div class="box input"><span class="svc">DynamoDB Streams + Lambda</span><span class="svc az">Cosmos DB change feed + Functions</span><b>Catalog change indexer</b><small>product edits searchable within seconds</small></div>
+      </div>
+      <div class="col"><h3>Add to cart</h3>
+        <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Functions</span><b>POST /cart/items</b><small>validate SKU, quantity and price</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box check"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Soft stock check</b><small>available &gt; 0; no reservation yet</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box state"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Cart table (source of truth)</b><small>conditional write on cart version</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box cache"><span class="svc">ElastiCache (Redis)</span><span class="svc az">Azure Cache for Redis</span><b>Cart cache</b><small>write-through; mini-cart badge reads from here</small></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>2. Checkout saga with compensation</h2>
+  <p class="sub">Orchestrated by AWS Step Functions (Azure: Durable Functions orchestrator, or Logic Apps). Each forward step has a compensating step; the saga state is the order record.</p>
+  <div class="flow">
+    <div class="box tool"><span class="svc">API Gateway + Lambda</span><span class="svc az">API Management + Functions</span><b>POST /checkout</b><small>Idempotency-Key header; returns order ID and status PENDING</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box state"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Create order (PENDING)</b><small>conditional put on idempotency key; a retry returns the same order</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box agent"><span class="svc">AWS Step Functions</span><span class="svc az">Durable Functions / Logic Apps</span><b>Checkout saga starts</b><small>standard workflow; every step retried with backoff, then caught</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box check"><span class="svc">Lambda + DynamoDB</span><span class="svc az">Functions + Cosmos DB</span><b>Step 1: reserve inventory</b><small>transactional conditional update: available - qty &ge; 0; reservation expires in 15 min</small></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box decision">Stock reserved?</div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="branches">
+      <div class="branch"><span class="label no">No: out of stock</span><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box fail"><b>Fail order (OUT_OF_STOCK)</b><small>nothing to compensate; shopper told which items are short</small></div>
+      </div>
+      <div class="branch"><span class="label yes">Yes: reserved</span><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box check"><span class="svc both">Payment provider (Stripe / Razorpay / Adyen)</span><b>Step 2: charge payment</b><small>authorise and capture with idempotency key = order ID</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box decision">Payment captured?</div>
+      </div>
+    </div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="branches">
+      <div class="branch"><span class="label no">No: declined or timed out</span><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box fail"><span class="svc">AWS Lambda</span><span class="svc az">Functions</span><b>Compensate: release inventory</b><small>reservation deleted, stock returned</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box fail"><b>Fail order (PAYMENT_FAILED)</b><small>on timeout, query the provider by idempotency key before deciding</small></div>
+      </div>
+      <div class="branch"><span class="label yes">Yes: captured</span><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box pass"><span class="svc">Lambda + DynamoDB</span><span class="svc az">Functions + Cosmos DB</span><b>Step 3: confirm order</b><small>status CONFIRMED; reservation converted to a sale</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="box decision">Confirm succeeded?</div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+        <div class="row">
+          <div class="box fail"><span class="label no">No</span><b>Compensate: refund, then release</b><small>refund with idempotency key; release stock; order CANCELLED</small></div>
+          <div class="box pass"><span class="label yes">Yes</span><span class="svc">Amazon EventBridge</span><span class="svc az">Event Grid</span><b>Publish OrderPlaced</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>3. Payment, inventory reservation and order events</h2>
+  <div class="cols">
+    <div class="col"><h3>Payment</h3>
+      <div class="box check"><span class="svc both">Payment provider</span><b>Idempotent charge</b><small>idempotency key = order ID; same key never charges twice</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+      <div class="box input"><span class="svc">API Gateway + Lambda</span><span class="svc az">API Management + Functions</span><b>Webhook receiver</b><small>verify signature; dedupe on provider event ID</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+      <div class="box state"><span class="svc">Amazon DynamoDB</span><span class="svc az">Cosmos DB</span><b>Payment record</b><small>status, amount, provider reference; card data never stored (provider tokens only)</small></div>
+    </div>
+    <div class="col"><h3>Inventory reservation</h3>
+      <div class="box state"><span class="svc">DynamoDB TransactWriteItems</span><span class="svc az">Cosmos DB transactional batch</span><b>Reserve all lines together</b><small>condition: available &ge; qty for every line, or none reserved</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+      <div class="box state"><span class="svc">DynamoDB TTL</span><span class="svc az">Cosmos DB TTL</span><b>Reservation expiry</b><small>abandoned checkouts free stock after 15 min</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+      <div class="box tool"><span class="svc">EventBridge Scheduler + Lambda</span><span class="svc az">Timer Function</span><b>Sweeper</b><small>returns expired reservations to available</small></div>
+    </div>
+    <div class="col"><h3>Order events</h3>
+      <div class="box input"><span class="svc">Amazon EventBridge</span><span class="svc az">Event Grid</span><b>OrderPlaced, PaymentCaptured, OrderShipped, OrderCancelled</b></div><div class="arrow"><span>rules fan out to</span><div class="line"></div><div class="head"></div></div>
+      <div class="box input"><span class="svc">Amazon SQS</span><span class="svc az">Service Bus queues</span><b>Per-consumer queues with DLQ</b><small>fulfilment, inventory sync, analytics</small></div><div class="arrow"><div class="line"></div><div class="head"></div></div>
+      <div class="box pass"><span class="svc">Amazon SNS</span><span class="svc az">Event Grid / Notification Hubs</span><b>Shopper notifications</b><small>order confirmation email, SMS and push</small></div>
+    </div>
+  </div>
+
+  <h2>4. Shopping concierge agent (optional)</h2>
+  <p class="sub">Matches the third Strands example: the agent builds a bundle across vendors, checks warranty, accessory compatibility and financing, and presents one validated package.</p>
+  <div class="flow">
+    <div class="box agent"><span class="svc">Amazon Bedrock (Claude)</span><span class="svc">Strands Agents</span><span class="svc">AgentCore Runtime</span><br><span class="svc az">Azure OpenAI</span><span class="svc az">Semantic Kernel agents</span><b>Shopping concierge agent</b><small>goal: one package that fits the shopper&rsquo;s need and budget; the model chooses which tools to call</small></div>
+    <div class="arrow"><span>uses tools</span><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Agent tools (Lambda / Functions)</span><div class="row">
+      <div class="box tool"><span class="svc">OpenSearch</span><span class="svc az">AI Search</span><b>Catalog search</b><small>candidates across vendors</small></div>
+      <div class="box tool"><span class="svc">DynamoDB</span><span class="svc az">Cosmos DB</span><b>Compatibility check</b><small>accessory fits the main item</small></div>
+      <div class="box tool"><span class="svc">AWS Lambda</span><span class="svc az">Functions</span><b>Warranty lookup</b><small>plans and terms per vendor</small></div>
+      <div class="box tool"><span class="svc both">Financing partner API</span><b>Financing offers</b><small>EMI or pay-later options</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="group"><span class="tag">Validation guardrail in code (before the bundle is shown)</span><div class="row">
+      <div class="box check"><b>Live price and stock</b><small>every item re-read from the catalog and inventory</small></div>
+      <div class="box check"><b>Compatibility confirmed</b><small>every accessory pair checked against the rules table</small></div>
+      <div class="box check"><b>Budget and offer valid</b><small>total within budget; financing offer still active</small></div>
+    </div></div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="box decision">Bundle valid?</div>
+    <div class="arrow"><div class="line"></div><div class="head"></div></div>
+    <div class="branches">
+      <div class="branch"><span class="label no">No</span><div class="arrow"><div class="line"></div><div class="head"></div></div><div class="box fail"><b>Reject and retry</b><small>reason sent back to the agent; after 2 tries, show plain recommendations</small></div></div>
+      <div class="branch"><span class="label yes">Yes</span><div class="arrow"><div class="line"></div><div class="head"></div></div><div class="box pass"><b>Present one package</b><small>added to cart as normal lines; checkout uses the same saga</small></div></div>
+    </div>
+  </div>
+
+  <h2>5. Caching strategy</h2>
+  <table>
+    <tr><th>Data</th><th>Where</th><th>Pattern and TTL</th><th>Invalidation</th></tr>
+    <tr><td>Static app, images</td><td>CloudFront + S3 / Front Door + Blob</td><td>Versioned file names, cache for days</td><td>New deploy changes the file name</td></tr>
+    <tr><td>Category and product pages</td><td>CloudFront / Front Door</td><td>Short TTL (60 s)</td><td>Invalidate on price or stock-out change</td></tr>
+    <tr><td>Hot catalog items</td><td>ElastiCache / Azure Cache for Redis</td><td>Read-through, TTL 5 min</td><td>Catalog change stream deletes the key</td></tr>
+    <tr><td>Shopper session</td><td>Redis</td><td>TTL 30 min, sliding</td><td>Sign-out deletes the key</td></tr>
+    <tr><td>Cart</td><td>Redis in front of DynamoDB / Cosmos DB</td><td>Write-through; DB is source of truth</td><td>Every cart write updates both</td></tr>
+    <tr><td>Search results</td><td>Redis</td><td>Popular queries, TTL 60 s</td><td>Expire only</td></tr>
+    <tr><td>Recommendations</td><td>Redis</td><td>Per shopper, TTL 15 min</td><td>Expire only; best sellers if missing</td></tr>
+    <tr><td>Inventory and payment</td><td>Not cached</td><td>Always read from the database at checkout</td><td>n/a</td></tr>
+  </table>
+
+  <h2>6. Data model notes (DynamoDB; Cosmos DB partition key in brackets)</h2>
+  <table>
+    <tr><th>Table</th><th>Partition key (PK)</th><th>Sort key (SK)</th><th>Notes</th></tr>
+    <tr><td>Catalog</td><td><code>PRODUCT#{productId}</code> [/productId]</td><td><code>META</code> or <code>SKU#{skuId}</code></td><td>GSI1 on <code>CATEGORY#{id}</code> + price for category pages; stream feeds the search index</td></tr>
+    <tr><td>Cart</td><td><code>CART#{userId or sessionId}</code> [/cartId]</td><td><code>ITEM#{skuId}</code></td><td>Version attribute for optimistic locking; TTL on guest carts</td></tr>
+    <tr><td>Inventory</td><td><code>SKU#{skuId}</code> [/skuId]</td><td><code>STOCK</code> or <code>RES#{orderId}</code></td><td>Stock row holds available and reserved counts; reservation rows carry TTL</td></tr>
+    <tr><td>Orders</td><td><code>ORDER#{orderId}</code> [/orderId]</td><td><code>META</code>, <code>LINE#{n}</code>, <code>PAY#{ref}</code></td><td>GSI1 on <code>USER#{userId}</code> + created date for order history</td></tr>
+    <tr><td>Idempotency</td><td><code>IDEMP#{key}</code> [/key]</td><td>none</td><td>Stores the first response; TTL 24 h; conditional put rejects duplicates</td></tr>
+  </table>
+
+  <h2>7. Failover and resilience</h2>
+  <div class="tests">
+    <div class="tcard"><h3>Multi-AZ by default</h3><ul>
+      <li>Lambda, API Gateway, DynamoDB, SQS, SNS, Step Functions and EventBridge are regional and span AZs (Azure: zone-redundant Functions Premium, Cosmos DB, Service Bus Premium).</li>
+      <li>ElastiCache with Multi-AZ replica and automatic failover (Azure Cache for Redis zone redundancy).</li>
+      <li>OpenSearch with 3 AZs and dedicated masters (Azure AI Search with replicas).</li>
+      <li>Optional second region: DynamoDB global tables (Cosmos DB multi-region writes) and Route 53 / Front Door health-based routing.</li>
+    </ul></div>
+    <div class="tcard"><h3>Retries and dead-letter queues</h3><ul>
+      <li>Step Functions Retry with exponential backoff and jitter, then Catch into the compensation path.</li>
+      <li>Every SQS / Service Bus consumer has a DLQ after 5 receives; alarm on DLQ depth above 0.</li>
+      <li>EventBridge rules have their own DLQ and retry policy.</li>
+      <li>Payment and recommendation calls have tight timeouts and circuit breakers.</li>
+    </ul></div>
+    <div class="tcard"><h3>Idempotency</h3><ul>
+      <li>Checkout requires an Idempotency-Key; a retry returns the stored response, not a new order.</li>
+      <li>Payment provider calls reuse the order ID as their key, so a retried charge never double-charges.</li>
+      <li>Event consumers dedupe on event ID, so at-least-once delivery is safe.</li>
+    </ul></div>
+    <div class="tcard"><h3>Graceful degradation</h3><ul>
+      <li>Recommendations or concierge down: show best sellers; checkout is unaffected.</li>
+      <li>Search down: fall back to category browse from the catalog table.</li>
+      <li>Redis down: read straight from DynamoDB / Cosmos DB at higher latency.</li>
+      <li>Fail closed on money and stock: never confirm an order without a captured payment and a reservation.</li>
+    </ul></div>
+  </div>
+
+  <h2>8. Latency targets</h2>
+  <p class="sub">Design targets, not measured numbers: an estimate for a typical store at peak load, measured from the API edge to the response.</p>
+  <table>
+    <tr><th>Path</th><th>What it covers</th><th>P50 (ms)</th><th>P90 (ms)</th><th>P99 (ms)</th></tr>
+    <tr><td>Edge cache hit</td><td>Product or category page from CloudFront / Front Door</td><td class="n">15</td><td class="n">30</td><td class="n">60</td></tr>
+    <tr><td>Product detail, Redis hit</td><td>API Gateway, Lambda, Redis</td><td class="n">30</td><td class="n">60</td><td class="n">120</td></tr>
+    <tr><td>Product detail, cache miss</td><td>Read-through to DynamoDB / Cosmos DB</td><td class="n">50</td><td class="n">90</td><td class="n">180</td></tr>
+    <tr><td>Search</td><td>OpenSearch / AI Search query with facets</td><td class="n">80</td><td class="n">150</td><td class="n">300</td></tr>
+    <tr><td>Add to cart</td><td>Validate, soft stock check, conditional write, cache update</td><td class="n">60</td><td class="n">120</td><td class="n">250</td></tr>
+    <tr><td>Recommendations</td><td>SageMaker / Azure ML endpoint, loaded async</td><td class="n">60</td><td class="n">120</td><td class="n">250</td></tr>
+    <tr><td>Checkout end to end</td><td>Saga: reserve, charge with provider, confirm</td><td class="n">900</td><td class="n">1,600</td><td class="n">3,000</td></tr>
+    <tr><td>Concierge bundle (optional)</td><td>Agent with Bedrock / Azure OpenAI and tools, plus validation</td><td class="n">3,000</td><td class="n">6,000</td><td class="n">10,000</td></tr>
+  </table>
+  <p class="note">Design point: the agent and recommendations are never on the checkout path. Most checkout time is the payment provider; the saga returns PENDING quickly and the page polls or listens for CONFIRMED.</p>
+
+  <h2>9. Testing</h2>
+  <div class="tests">
+    <div class="tcard"><h3>1. Load testing</h3><ul>
+      <li>Tooling: k6 or Locust, run at scale with Distributed Load Testing on AWS (Azure Load Testing on Azure).</li>
+      <li>Mix: 70% browse, 20% search, 8% cart, 2% checkout (example), with a payment provider sandbox or stub.</li>
+      <li>Patterns: steady, spike (10x in 60 s, like a flash sale) and 8-hour soak.</li>
+      <li>Watch DynamoDB throttles, Lambda concurrency, Redis CPU and queue depth.</li>
+    </ul></div>
+    <div class="tcard"><h3>2. Latency validation</h3><ul>
+      <li>P50, P90 and P99 per path from k6 results plus CloudWatch metrics and AWS X-Ray traces (Application Insights on Azure).</li>
+      <li>Pass only if every path meets the targets above at peak load, including the spike.</li>
+      <li>Break checkout down by saga step to find the slow span.</li>
+    </ul></div>
+    <div class="tcard"><h3>3. Checkout saga and compensation</h3><ul>
+      <li>Happy path: reserve, charge, confirm, OrderPlaced published exactly once.</li>
+      <li>Inject failures at each step: out of stock, payment declined, payment timeout, confirm failure.</li>
+      <li>Assert the right compensation ran: stock released, refund issued, order in the correct final state.</li>
+      <li>Kill a Lambda mid-step with AWS Fault Injection Service and check the saga resumes or compensates.</li>
+    </ul></div>
+    <div class="tcard"><h3>4. Payment idempotency</h3><ul>
+      <li>Send the same checkout with the same Idempotency-Key 10 times in parallel: one order, one charge.</li>
+      <li>Replay provider webhooks and out-of-order webhooks: payment status stays correct.</li>
+      <li>Timeout then retry: the provider is queried by key, never charged twice.</li>
+    </ul></div>
+    <div class="tcard"><h3>5. Inventory oversell</h3><ul>
+      <li>Stock of 5 units, 100 concurrent checkouts: exactly 5 succeed, 95 get OUT_OF_STOCK.</li>
+      <li>Multi-line orders reserve all lines or none.</li>
+      <li>Expired reservations return stock; available never goes below zero.</li>
+    </ul></div>
+    <div class="tcard"><h3>6. Concierge guardrail (optional)</h3><ul>
+      <li>Golden set of bundle requests: every presented bundle passes price, stock, compatibility and budget checks.</li>
+      <li>Feed the guardrail incompatible accessories, stale prices and expired offers: each must be rejected.</li>
+    </ul></div>
+    <div class="tcard" style="grid-column:1/-1;border-left-color:#2e7d32"><h3>7. Regression testing and CI</h3><ul>
+      <li><b>pytest:</b> regression tests for cart pricing, inventory reservation, saga state transitions, idempotency handling and the concierge validation rules, with <code>pytest.mark.parametrize</code> for boundary cases and shared conftest fixtures (sample catalog, carts, stock levels).</li>
+      <li><b>Playwright:</b> UI checkout tests end to end: search, add to cart, sign in or guest, pay with a sandbox card, see the confirmation; plus a declined-card path.</li>
+      <li><b>CI:</b> the suite runs on every change (AWS CodePipeline with CodeBuild, Azure DevOps Pipelines or GitHub Actions); a failing saga, idempotency or oversell test blocks the merge and the deploy.</li>
+      <li><b>Reporting:</b> results pushed as CloudWatch / Azure Monitor metrics with an alarm on any failure.</li>
+    </ul></div>
+  </div>
+</main>
+</body>
+</html>
