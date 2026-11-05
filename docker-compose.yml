@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: ./backend
+    environment:
+      KITLINE_MODE: offline
+      KITLINE_EMBEDDINGS: local
+      KITLINE_VECTOR_STORE: local
+      KITLINE_SESSION_STORE: file
+      KITLINE_SESSION_DIR: /data/sessions
+    volumes:
+      - sessions:/data/sessions
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  sessions:
